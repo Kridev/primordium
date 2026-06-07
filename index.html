@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Primordium — an emergent life simulation</title>
+<meta name="description" content="An emergent particle-life ecosystem: a few simple rules between coloured species produce cells, membranes and chasers that were never programmed. Runs entirely in the browser.">
+<meta name="theme-color" content="#05060a">
+<meta property="og:title" content="Primordium">
+<meta property="og:description" content="A few simple rules between coloured species → life that was never programmed.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305060a'/%3E%3Ccircle cx='11' cy='13' r='3' fill='%236df3c0'/%3E%3Ccircle cx='21' cy='12' r='2.4' fill='%238a7bff'/%3E%3Ccircle cx='16' cy='21' r='2.6' fill='%23ff5d73'/%3E%3Ccircle cx='23' cy='21' r='1.8' fill='%23ffd166'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#05060a; --panel:rgba(16,18,28,.78); --panel-br:rgba(120,140,200,.18);
+    --txt:#cfd6ea; --dim:#7d86a3; --accent:#6df3c0; --accent2:#8a7bff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;user-select:none}
+  #stage{position:fixed;inset:0;display:block;touch-action:none}
+  /* soft vignette to draw the eye to the centre */
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.45) 100%)}
+  /* ---- side panel ---- */
+  #ui{position:fixed;top:14px;left:14px;width:300px;max-height:calc(100vh - 28px);
+    overflow-y:auto;background:var(--panel);backdrop-filter:blur(14px) saturate(140%);
+    border:1px solid var(--panel-br);border-radius:16px;padding:16px 16px 20px;
+    box-shadow:0 18px 60px rgba(0,0,0,.55);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:10}
+  #ui.hidden{transform:translateX(-340px)}
+  #ui{animation:fadeIn .6s ease both}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  #ui::-webkit-scrollbar{width:9px}
+  #ui::-webkit-scrollbar-track{background:transparent}
+  #ui::-webkit-scrollbar-thumb{background:rgba(120,140,200,.25);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+  #ui::-webkit-scrollbar-thumb:hover{background:rgba(120,140,200,.45);background-clip:padding-box}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:.5px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
+  .sub{font-size:11px;color:var(--dim);margin-bottom:14px;letter-spacing:.3px}
+  .group{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .group:last-child{border-bottom:none}
+  .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);
+    margin:10px 0 5px;text-transform:uppercase;letter-spacing:.6px}
+  .lbl b{color:var(--txt);font-weight:600}
+  input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:4px;
+    background:linear-gradient(90deg,var(--accent2),var(--accent));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;
+    border-radius:50%;background:#fff;cursor:pointer;box-shadow:0 0 8px rgba(109,243,192,.7)}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  button{flex:1;min-width:64px;background:rgba(255,255,255,.06);color:var(--txt);
+    border:1px solid var(--panel-br);border-radius:10px;padding:9px 8px;font-size:12px;
+    cursor:pointer;transition:.15s;font-weight:600}
+  button:hover{background:rgba(109,243,192,.16);border-color:var(--accent)}
+  button.active{background:linear-gradient(90deg,var(--accent2),var(--accent));color:#05060a}
+  .hint{font-size:10.5px;color:var(--dim);line-height:1.5;margin-top:4px}
+  kbd{background:rgba(255,255,255,.08);border:1px solid var(--panel-br);border-radius:5px;
+    padding:1px 5px;font-size:10px;font-family:inherit}
+  #toggleUI{position:fixed;top:14px;left:14px;z-index:11;width:40px;height:40px;border-radius:12px;
+    display:none;align-items:center;justify-content:center;font-size:18px;flex:none}
+  #toggleUI.show{display:flex}
+  /* matrix */
+  #matrixWrap{margin-top:6px}
+  table.matrix{border-collapse:collapse;margin:0 auto}
+  table.matrix td{width:20px;height:20px;cursor:pointer;border-radius:3px}
+  #hud{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:9;
+    display:flex;gap:18px;font-size:11px;color:var(--dim);background:var(--panel);
+    padding:7px 18px;border-radius:20px;border:1px solid var(--panel-br);
+    backdrop-filter:blur(10px)}
+  #hud b{color:var(--accent);font-weight:700}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+  #intro{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(ellipse at center,rgba(8,9,16,.35),rgba(5,6,10,.85));
+    transition:opacity 1.2s ease;cursor:pointer}
+  #intro.gone{opacity:0;pointer-events:none}
+  #intro .big{font-size:54px;font-weight:800;letter-spacing:2px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 30px rgba(109,243,192,.35))}
+  #intro p{color:var(--dim);font-size:14px;margin:10px 0 0;letter-spacing:.5px}
+  #intro .go{margin-top:26px;font-size:12px;color:var(--accent);letter-spacing:1px;
+    border:1px solid var(--accent);padding:10px 22px;border-radius:24px;
+    animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  #helpBtn{position:fixed;top:14px;right:14px;z-index:11;width:40px;height:40px;
+    border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+  #help{position:fixed;inset:0;z-index:21;display:none;align-items:center;justify-content:center;
+    background:rgba(3,4,8,.7);backdrop-filter:blur(6px);padding:20px}
+  #help.show{display:flex}
+  #help .card{max-width:520px;width:100%;background:var(--panel);border:1px solid var(--panel-br);
+    border-radius:18px;padding:26px 28px;box-shadow:0 24px 80px rgba(0,0,0,.6);line-height:1.65;font-size:13.5px;color:var(--txt)}
+  #help h2{margin:0 0 6px;font-size:22px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #help .muted{color:var(--dim);font-size:12px;margin-bottom:14px}
+  #help b{color:var(--accent)}
+  #help .close{margin-top:18px;text-align:center}
+  #help .close button{display:inline-block;width:auto;flex:none;padding:9px 26px}
+  /* respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    #ui{animation:none}
+    #intro .go{animation:none}
+    #intro{transition:none}
+  }
+  /* ---- small screens: panel becomes a scrollable bottom sheet ---- */
+  @media (max-width:600px){
+    #ui{top:auto;bottom:0;left:0;width:100%;max-height:62vh;
+      border-radius:16px 16px 0 0;padding:14px 14px 18px}
+    #ui.hidden{transform:translateY(110%)}
+    #toggleUI{top:auto;bottom:14px;left:14px}
+    #toggleUI.show{display:flex}
+    #bClose{top:10px;right:10px}
+    #hud{bottom:auto;top:10px;font-size:10px;gap:12px;padding:6px 12px}
+    #intro .big{font-size:38px}
+    #intro p{font-size:12px;padding:0 24px}
+  }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="vignette"></div>
+<button id="toggleUI" title="Show panel" aria-label="Show control panel">☰</button>
+
+<div id="intro">
+  <div class="big">PRIMORDIUM</div>
+  <p>five colours · a few simple rules · life that was never programmed</p>
+  <div class="go">enter the dish →</div>
+</div>
+
+<div id="ui">
+  <button id="bClose" title="Hide panel (H)" aria-label="Hide control panel" style="position:absolute;top:14px;right:14px;width:28px;height:28px;flex:none;padding:0;border-radius:8px;font-size:14px">×</button>
+  <h1>Primordium</h1>
+  <div class="sub">an emergent particle-life ecosystem</div>
+
+  <div class="group">
+    <div class="lbl">Particles <b id="vCount">0</b></div>
+    <input type="range" id="sCount" min="200" max="4000" step="100" value="1500">
+    <div class="lbl">Species <b id="vSpecies">5</b></div>
+    <input type="range" id="sSpecies" min="2" max="7" step="1" value="5">
+  </div>
+
+  <div class="group">
+    <div class="lbl">Force <b id="vForce">1.0</b></div>
+    <input type="range" id="sForce" min="0" max="3" step="0.05" value="1">
+    <div class="lbl">Interaction radius <b id="vRange">90</b></div>
+    <input type="range" id="sRange" min="30" max="180" step="5" value="90">
+    <div class="lbl">Friction <b id="vFriction">0.86</b></div>
+    <input type="range" id="sFriction" min="0.5" max="0.98" step="0.01" value="0.86">
+  </div>
+
+  <div class="group">
+    <div class="lbl">Sim speed <b id="vSpeed">1×</b></div>
+    <input type="range" id="sSpeed" min="1" max="4" step="1" value="1">
+    <div class="lbl">Particle size <b id="vPsize">1.7</b></div>
+    <input type="range" id="sPsize" min="1" max="5" step="0.1" value="1.7">
+    <div class="lbl">Trail length <b id="vTrail">72%</b></div>
+    <input type="range" id="sTrail" min="0" max="100" step="1" value="72">
+    <div class="lbl">Theme</div>
+    <div class="row" id="themes"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="bGlow" class="active">✨ Glow</button>
+      <button id="bBonds">🔗 Bonds</button>
+      <button id="bAurora">🌈 Aurora</button>
+      <button id="bFull">⛶ Fullscreen</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="lbl">Attraction matrix</div>
+    <div id="matrixWrap"></div>
+    <div class="hint">Click a cell to cycle attraction (green) ↔ repulsion (red). Rows feel columns.</div>
+  </div>
+
+  <div class="group">
+    <div class="row">
+      <button id="bRandom">Randomize</button>
+      <button id="bSymmetry">Symmetric</button>
+      <button id="bZero">Clear</button>
+      <button id="bSurprise">🎲 Surprise me</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="bPause">Pause</button>
+      <button id="bTrails" class="active">Trails</button>
+      <button id="bBang">💥 Big Bang</button>
+      <button id="bEvolve">🧬 Evolve</button>
+      <button id="bAuto">📺 Auto</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="lbl">Presets</div>
+    <div class="row" id="presets"></div>
+  </div>
+
+  <div class="group">
+    <div class="row">
+      <button id="bSnap">📷 PNG</button>
+      <button id="bRec">🎬 Record</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="bSave">Save</button>
+      <button id="bLoad">Load</button>
+      <button id="bShare">Share</button>
+    </div>
+    <div class="hint" id="status"></div>
+  </div>
+
+  <div class="group">
+    <div class="lbl">Ambience <span style="text-transform:none;letter-spacing:0;font-size:9px;opacity:.7">experimental</span></div>
+    <div class="row">
+      <button id="bFire">🔥 Fire</button>
+      <button id="bWind">🌬️ Wind</button>
+      <button id="bRain">🌧️ Rain</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="bBirds">🐦 Birds</button>
+      <button id="bNoise">📻 Noise</button>
+      <button id="bMelody">🎵 Melody</button>
+    </div>
+    <div class="hint">Stack any layers — each evolves and breathes with the swarm. 🎵 improvises an original saw lead over a brooding chord progression — never the same twice (gorgeous in the Cave with 🔁 Echo).</div>
+    <div class="lbl" style="margin-top:12px">Space — room reverb</div>
+    <div class="row" id="spaces"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="bEcho">🔁 Echo</button>
+    </div>
+    <div class="hint">Real convolution reverb (a synthesized room). Echo adds rhythmic repeats — lovely under 🎵.</div>
+  </div>
+
+  <div class="hint">
+    <kbd>Space</kbd> pause · <kbd>R</kbd> rules · <kbd>S</kbd> surprise ·
+    <kbd>1–4</kbd> presets · <kbd>G</kbd> glow · <kbd>B</kbd> bonds ·
+    <kbd>E</kbd> evolve · <kbd>F</kbd> fullscreen · <kbd>H</kbd> panel ·
+    drag to stir · double-click to seed
+  </div>
+</div>
+
+<button id="helpBtn" title="What is this? (?)" aria-label="Help and about">?</button>
+<div id="help">
+  <div class="card">
+    <h2>Primordium</h2>
+    <div class="muted">an emergent particle-life ecosystem</div>
+    <p>Every dot belongs to a coloured <b>species</b>. An <b>attraction matrix</b>
+    decides how strongly each colour is pulled toward or pushed from every other —
+    and below a short range everything repels, so nothing collapses. That's the
+    entire model. The cells, membranes, chasers and oscillators you see were never
+    coded; they're just what those rules <i>do</i>.</p>
+    <p><b>Try this:</b> hit <b>🎲 Surprise me</b> for a fresh world, click cells in the
+    matrix to rewrite the laws of physics, drag to stir, double-click to drop a colony,
+    or turn on <b>📺 Auto</b> and just watch.</p>
+    <p class="muted"><b>Keys:</b> Space pause · R rules · S surprise · 1–4 presets ·
+    G glow · B bonds · A aurora · E evolve · T trails · F fullscreen · H panel</p>
+    <div class="close"><button id="helpClose">Got it</button></div>
+  </div>
+</div>
+
+<div id="hud">
+  <span>FPS <b id="vFps">–</b></span>
+  <span>Clusters <b id="vClusters">–</b></span>
+  <span id="legend"></span>
+</div>
+
+<script src="sim.js"></script>
+<script src="progression.js"></script>
+<script src="ambience.js"></script>
+<script src="ui.js"></script>
+<script src="tools.js"></script>
+</body>
+</html>

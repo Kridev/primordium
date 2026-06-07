@@ -1,0 +1,2 @@
+# raw MIDI source (the app only needs the derived progression.js)
+*.mid
