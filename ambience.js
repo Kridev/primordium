@@ -270,7 +270,7 @@ setInterval(() => {
   if (W){
     const lvl = W.on ? walk(windState, now) : (windState.lvl *= 0.92, windState.lvl);
     const tremor = 0.85 + 0.15*Math.sin(phase*0.9 + 0.5);
-    W.gain.gain.setTargetAtTime((0.004 + 0.085*lvl*lvl) * tremor, now, 0.7);
+    W.gain.gain.setTargetAtTime(W.on ? (0.004 + 0.085*lvl*lvl) * tremor : 0, now, 0.6);
     W.bp.frequency.setTargetAtTime(120 + 260*lvl, now, 0.9);     // gust = airier/higher
     W.lp.frequency.setTargetAtTime(430 + 1500*lvl, now, 0.9);    // and brighter
   }
@@ -281,7 +281,7 @@ setInterval(() => {
   const R = layers.rain;
   if (R){
     const lvl = R.on ? walk(rainState, now) : (rainState.lvl *= 0.92, rainState.lvl);
-    R.gain.gain.setTargetAtTime(0.005 + 0.032*lvl, now, 0.7);
+    R.gain.gain.setTargetAtTime(R.on ? (0.005 + 0.032*lvl) : 0, now, 0.6);
     R.hp.frequency.setTargetAtTime(1300 - 550*lvl, now, 1.2);    // heavier = fuller body
     R.lp.frequency.setTargetAtTime(3000 + 4200*lvl, now, 1.2);   // heavier = brighter
     if (R.on){ const drops = (lvl*6)|0; for (let d=0; d<drops; d++) if (Math.random()<0.6) droplet(); }
