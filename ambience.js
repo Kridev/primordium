@@ -162,11 +162,12 @@ let motif = [], motifAge = 0, phraseLow = 76, phraseHigh = 86, lastPhrase = -1;
 const mfreq = m => 440 * Math.pow(2, (m - 69) / 12);
 function sawNote(freq, t, len, pan, peak){
   const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = freq;
-  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 4;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.6;   // no resonant peak
   const g = actx.createGain();
-  lp.frequency.setValueAtTime(freq*2 + 300, t);
-  lp.frequency.linearRampToValueAtTime(freq*5 + 900, t + len*0.45);
-  lp.frequency.linearRampToValueAtTime(freq*2 + 300, t + len);
+  // a gentle (non-resonant) filter swell, kept low so the saw stays mellow
+  lp.frequency.setValueAtTime(freq*1.3 + 120, t);
+  lp.frequency.linearRampToValueAtTime(freq*2.2 + 300, t + len*0.45);
+  lp.frequency.linearRampToValueAtTime(freq*1.3 + 120, t + len);
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(peak || 0.03, t + 0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, t + len);
@@ -334,7 +335,7 @@ function ensure(){
   // melody bus: one gentle lowpass over the whole melody (pad + lead) so the saw
   // sits softer and rounder, then out into the dry + FX send like everything else.
   melodyBus = actx.createGain(); melodyBus.gain.value = 0.82;
-  const melodyLP = actx.createBiquadFilter(); melodyLP.type = 'lowpass'; melodyLP.frequency.value = 2200; melodyLP.Q.value = 0.7;
+  const melodyLP = actx.createBiquadFilter(); melodyLP.type = 'lowpass'; melodyLP.frequency.value = 1800; melodyLP.Q.value = 0.5;
   melodyBus.connect(melodyLP); toMix(melodyLP);
 
   whiteBuf = noiseBuffer(3);
