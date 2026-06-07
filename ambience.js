@@ -9,6 +9,7 @@ const $ = id => document.getElementById(id);
 
 let actx = null, out = null, whiteBuf = null, started = false;
 let convL = null, wetTone = null, wetG = null, send = null;     // reverb bus + FX send
+let melodyBus = null;                                           // gentle lowpass over the melody
 let echoDelay = null, echoG = null, echoOn = false;             // echo bus
 const layers = {};
 
@@ -152,9 +153,9 @@ function chirp(){
 // progression.js provides only the harmony (chord voicings + timing). The lead
 // line here is composed live from the current chord's tones — fully original.
 const CHORDS = window.CHORD_PROG || [];   // [blockDurMs, [midiPitches]]
-const SONG_SPEED = 1.0;
+const SONG_SPEED = 1.09;                  // >1 = slower; ~10 BPM under the source tempo
 let BEAT = 0.5, EIGHTH = 0.25;
-if (CHORDS.length){ BEAT = Math.min.apply(null, CHORDS.map(c => c[0])) / 1000; EIGHTH = BEAT / 2; }
+if (CHORDS.length){ BEAT = Math.min.apply(null, CHORDS.map(c => c[0])) / 1000; EIGHTH = (BEAT / 2) * SONG_SPEED; }
 const PHRASE = 8;                          // beats per melodic phrase
 let chordIdx = 0, songTime = 0, songPos = 0, chordBeatsLeft = 0, curChord = null, lastLead = 81;
 let motif = [], motifAge = 0, phraseLow = 76, phraseHigh = 86, lastPhrase = -1;
@@ -171,7 +172,8 @@ function sawNote(freq, t, len, pan, peak){
   g.gain.exponentialRampToValueAtTime(0.0001, t + len);
   o.connect(lp); lp.connect(g);
   const p = actx.createStereoPanner ? actx.createStereoPanner() : null;
-  if (p){ p.pan.value = pan; g.connect(p); toMix(p); } else toMix(g);
+  const dest = melodyBus || out;   // melody runs through its own lowpass bus
+  if (p){ p.pan.value = pan; g.connect(p); p.connect(dest); } else g.connect(dest);
   o.start(t); o.stop(t + len + 0.05);
 }
 // a fresh rhythm motif for a phrase: which eighth-note slots carry a note.
@@ -328,6 +330,12 @@ function ensure(){
   send.connect(echoG); echoG.connect(echoDelay);
   echoDelay.connect(echoDamp); echoDamp.connect(echoFb); echoFb.connect(echoDelay);
   echoDelay.connect(echoWet); echoWet.connect(actx.destination);
+
+  // melody bus: one gentle lowpass over the whole melody (pad + lead) so the saw
+  // sits softer and rounder, then out into the dry + FX send like everything else.
+  melodyBus = actx.createGain(); melodyBus.gain.value = 0.82;
+  const melodyLP = actx.createBiquadFilter(); melodyLP.type = 'lowpass'; melodyLP.frequency.value = 2200; melodyLP.Q.value = 0.7;
+  melodyBus.connect(melodyLP); toMix(melodyLP);
 
   whiteBuf = noiseBuffer(3);
   buildLayers();
